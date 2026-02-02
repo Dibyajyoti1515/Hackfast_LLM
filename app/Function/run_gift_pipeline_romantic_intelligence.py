@@ -5,7 +5,7 @@ from google.genai import types
 import uuid
 import json
 
-from app.LLMAgents.gift_recommendation_agent import gift_recommendation_pipeline
+from app.LLMAgents.romantic_gift_recommendation_agent import gift_recommendation_pipeline
 
 APP_NAME = "Gift Recommendation"
 USER_ID = "Dgjjg"

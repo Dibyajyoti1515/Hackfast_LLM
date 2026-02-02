@@ -5,24 +5,15 @@ from google.genai import types
 import uuid
 import json
 
-from app.LLMAgents.gift_recommendation_agent import gift_recommendation_pipeline
+from app.LLMAgents.describe_gift_recommendation_agent import gift_recommendation_pipeline
 
 APP_NAME = "Gift Recommendation"
-USER_ID = "Dgjjg"
-session_name = "hello"
 
-def payload_to_prompt_string(payload: dict) -> str:
-    parts = []
-    for key, value in payload.items():
-        clean_value = str(value).replace("\n", " ").strip()
-        parts.append(f"[{key}: {clean_value}]")
-    return ", ".join(parts)
 
 def normalize_llm_json(raw):
     if raw is None:
         return None
 
-    # ✅ Already parsed dict
     if isinstance(raw, dict):
         return raw
 
@@ -31,16 +22,13 @@ def normalize_llm_json(raw):
 
     text = raw.strip()
 
-    # ✅ Try direct JSON first
     try:
         return json.loads(text)
     except Exception:
         pass
 
-    # ✅ Remove markdown fences
     text = text.replace("```json", "").replace("```", "").strip()
 
-    # ✅ Extract JSON between first { and last }
     start = text.find("{")
     end = text.rfind("}")
 
@@ -49,11 +37,12 @@ def normalize_llm_json(raw):
 
     try:
         return json.loads(text)
-    except Exception as e:
+    except Exception:
         print("❌ Failed to normalize JSON from LLM")
         print("RAW:", raw)
         print("CLEANED:", text)
         return None
+
 
 def extract_agent_outputs(events: list):
     product_response = None
@@ -73,17 +62,15 @@ def extract_agent_outputs(events: list):
             product_response = normalize_llm_json(raw)
 
         if "profile_analyzer_response" in state_delta:
-            raw = state_delta["profile_analyzer_response"]
-            try:
-                profile_response = json.loads(raw)
-            except Exception:
-                profile_response = raw
+            profile_response = state_delta["profile_analyzer_response"]
 
     return {
         "product_extraction_response": product_response,
         "profile_analyzer_response": profile_response
     }
 
+
+# 🌱 Services
 session_service = InMemorySessionService()
 
 support_app = App(
@@ -97,34 +84,66 @@ runner = Runner(
 )
 
 
+# 🧠 TEXT PIPELINE ENTRYPOINT
+# 🧠 TEXT PIPELINE ENTRYPOINT
 async def run_gift_pipeline(payload: dict):
+    print("📦 Incoming payload:", payload)
 
-    conversation_text = payload_to_prompt_string(payload)
+    if not isinstance(payload, dict):
+        raise ValueError("payload must be a dict")
+
+    # ✅ CASE 1: New text-based pipeline
+    if "text" in payload and isinstance(payload["text"], str):
+        prompt_text = payload["text"].strip()
+
+        if not prompt_text:
+            raise ValueError("payload.text is empty")
+
+        print("📝 Using direct text prompt")
+
+    # ✅ CASE 2: Legacy structured payload (fallback)
+    else:
+        print("🧱 Using structured payload fallback")
+
+        parts = []
+        for key, value in payload.items():
+            clean_value = str(value).replace("\n", " ").strip()
+            if clean_value:
+                parts.append(f"{key}: {clean_value}")
+
+        prompt_text = ". ".join(parts)
+
+        if not prompt_text.strip():
+            raise ValueError("Failed to build prompt text from payload")
+
+    # 🧬 Generate identity
     session_id = str(uuid.uuid4())
-    result = []
+    user_id = session_id   # keep unique identity internally
+
+    result_events = []
 
     content = types.Content(
         role="user",
-        parts=[types.Part(text=conversation_text)]
+        parts=[types.Part(text=prompt_text)]
     )
 
     session = await session_service.create_session(
         app_name=APP_NAME,
-        user_id=USER_ID,
+        user_id=user_id,
         session_id=session_id,
     )
 
     async for event in runner.run_async(
-        user_id=USER_ID,
+        user_id=user_id,
         new_message=content,
         session_id=session.id,
     ):
-        print(event)
-        result.append(event)
+        print("📡 EVENT:", event)
+        result_events.append(event)
 
-    extracted = extract_agent_outputs(result)
+    extracted = extract_agent_outputs(result_events)
 
-    print(extracted)
+    print("✅ Extracted:", extracted)
 
     return {
         "result": extracted,

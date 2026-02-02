@@ -5,7 +5,7 @@ from google.genai import types
 import uuid
 import json
 
-from app.LLMAgents.gift_recommendation_agent import gift_recommendation_pipeline
+from app.LLMAgents.enrich_gift_recommendation_pipeline import enrich_gift_recommendation_pipeline
 
 APP_NAME = "Gift Recommendation"
 USER_ID = "Dgjjg"
@@ -50,7 +50,7 @@ def normalize_llm_json(raw):
     try:
         return json.loads(text)
     except Exception as e:
-        print("❌ Failed to normalize JSON from LLM")
+        print("Failed to normalize JSON from LLM")
         print("RAW:", raw)
         print("CLEANED:", text)
         return None
@@ -88,7 +88,7 @@ session_service = InMemorySessionService()
 
 support_app = App(
     name=APP_NAME,
-    root_agent=gift_recommendation_pipeline,
+    root_agent=enrich_gift_recommendation_pipeline,
 )
 
 runner = Runner(
