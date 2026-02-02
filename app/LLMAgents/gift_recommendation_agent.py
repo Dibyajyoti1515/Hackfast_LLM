@@ -7,6 +7,6 @@ gift_recommendation_pipeline = ParallelAgent(
     name="gift_pipeline",
     sub_agents=[
         profile_analyzer_agent,
-        product_extractor_agent
+        product_extractor_agent,
     ]
 )
